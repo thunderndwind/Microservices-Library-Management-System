@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  # MongoDB for User and Admin Services
+  mongodb:
+    image: mongo:7.0
+    container_name: library-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: library
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - library-network
+
+  # MySQL for Book Service
+  mysql:
+    image: mysql:8.0
+    container_name: library-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword123
+      MYSQL_DATABASE: library_books
+      MYSQL_USER: library_user
+      MYSQL_PASSWORD: library_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - library-network
+
+  # PostgreSQL for Reservation Service
+  postgresql:
+    image: postgres:16
+    container_name: library-postgresql
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: library_reservations
+      POSTGRES_USER: library_user
+      POSTGRES_PASSWORD: library_password
+    volumes:
+      - postgresql_data:/var/lib/postgresql/data
+    networks:
+      - library-network
+
+  # Redis for Notification Service
+  redis:
+    image: redis:7.2-alpine
+    container_name: library-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - library-network
+
+  # RabbitMQ for Event Messaging
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: library-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - library-network
+
+volumes:
+  mongodb_data:
+  mysql_data:
+  postgresql_data:
+  redis_data:
+  rabbitmq_data:
+
+networks:
+  library-network:
+    driver: bridge 

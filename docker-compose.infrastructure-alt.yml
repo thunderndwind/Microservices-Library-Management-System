@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  # MongoDB for User and Admin Services
+  mongodb:
+    image: mongo:7.0
+    container_name: library-mongodb-dev
+    restart: unless-stopped
+    ports:
+      - "27018:27017"  # Using different port to avoid conflicts
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: library
+    volumes:
+      - mongodb_data_dev:/data/db
+    networks:
+      - library-network-dev
+
+  # MySQL for Book Service
+  mysql:
+    image: mysql:8.0
+    container_name: library-mysql-dev
+    restart: unless-stopped
+    ports:
+      - "3307:3306"  # Using different port to avoid conflicts
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword123
+      MYSQL_DATABASE: library_books
+      MYSQL_USER: library_user
+      MYSQL_PASSWORD: library_password
+    volumes:
+      - mysql_data_dev:/var/lib/mysql
+    networks:
+      - library-network-dev
+
+  # PostgreSQL for Reservation Service
+  postgresql:
+    image: postgres:16
+    container_name: library-postgresql-dev
+    restart: unless-stopped
+    ports:
+      - "5433:5432"  # Using different port to avoid conflicts
+    environment:
+      POSTGRES_DB: library_reservations
+      POSTGRES_USER: library_user
+      POSTGRES_PASSWORD: library_password
+    volumes:
+      - postgresql_data_dev:/var/lib/postgresql/data
+    networks:
+      - library-network-dev
+
+  # Redis for Notification Service
+  redis:
+    image: redis:7.2-alpine
+    container_name: library-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6380:6379"  # Using different port to avoid conflicts
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data_dev:/data
+    networks:
+      - library-network-dev
+
+  # RabbitMQ for Event Messaging
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: library-rabbitmq-dev
+    restart: unless-stopped
+    ports:
+      - "5673:5672"   # Using different port to avoid conflicts
+      - "15673:15672"  # Using different port to avoid conflicts
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data_dev:/var/lib/rabbitmq
+    networks:
+      - library-network-dev
+
+volumes:
+  mongodb_data_dev:
+  mysql_data_dev:
+  postgresql_data_dev:
+  redis_data_dev:
+  rabbitmq_data_dev:
+
+networks:
+  library-network-dev:
+    driver: bridge 

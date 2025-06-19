@@ -1,0 +1,208 @@
+version: '3.8'
+
+services:
+  # Database Services
+  mongodb:
+    image: mongo:7.0
+    container_name: library_mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - library_network
+
+  mysql:
+    image: mysql:8.0
+    container_name: library_mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: password123
+      MYSQL_DATABASE: library_books
+      MYSQL_USER: library_user
+      MYSQL_PASSWORD: password123
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - library_network
+
+  postgresql:
+    image: postgres:15
+    container_name: library_postgresql
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: library_reservations
+      POSTGRES_USER: library_user
+      POSTGRES_PASSWORD: password123
+    volumes:
+      - postgresql_data:/var/lib/postgresql/data
+    networks:
+      - library_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: library_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - library_network
+
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: library_rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: password123
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - library_network
+
+  # Application Services
+  user-service:
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+    container_name: library_user_service
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - MONGODB_URI=mongodb://admin:password123@mongodb:27017/library_users?authSource=admin
+      - JWT_SECRET=your_super_secret_jwt_key_for_users_change_in_production
+      - JWT_REFRESH_SECRET=your_super_secret_refresh_key_for_users_change_in_production
+      - RABBITMQ_URL=amqp://admin:password123@rabbitmq:5672
+      - CORS_ORIGIN=http://localhost:3002
+    depends_on:
+      - mongodb
+      - rabbitmq
+    networks:
+      - library_network
+
+  admin-service:
+    build:
+      context: ./services/admin-service
+      dockerfile: Dockerfile
+    container_name: library_admin_service
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=production
+      - PORT=3003
+      - MONGODB_URI=mongodb://admin:password123@mongodb:27017/library_admins?authSource=admin
+      - JWT_SECRET=your_super_secret_jwt_key_for_admins_change_in_production
+      - JWT_REFRESH_SECRET=your_super_secret_refresh_key_for_admins_change_in_production
+      - RABBITMQ_URL=amqp://admin:password123@rabbitmq:5672
+      - CORS_ORIGIN=http://localhost:3004
+      - USER_SERVICE_URL=http://user-service:3001
+      - SERVICE_TOKEN=internal-service-token-change-in-production
+    depends_on:
+      - mongodb
+      - rabbitmq
+      - user-service
+    networks:
+      - library_network
+
+  book-service:
+    build:
+      context: ./services/book-service
+      dockerfile: Dockerfile
+    container_name: library_book_service
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=production
+      - APP_KEY=base64:your_app_key_here_change_in_production
+      - DB_CONNECTION=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=library_books
+      - DB_USERNAME=library_user
+      - DB_PASSWORD=password123
+      - JWT_SECRET=your_jwt_secret_here_change_in_production
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=admin
+      - RABBITMQ_PASSWORD=password123
+      - SERVICE_TOKEN=internal-service-token-change-in-production
+    depends_on:
+      - mysql
+      - rabbitmq
+    networks:
+      - library_network
+
+  reservation-service:
+    build:
+      context: ./services/reservation-service
+      dockerfile: Dockerfile
+    container_name: library_reservation_service
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - RAILS_ENV=production
+      - DATABASE_URL=postgresql://library_user:password123@postgresql:5432/library_reservations
+      - RABBITMQ_URL=amqp://admin:password123@rabbitmq:5672
+      - JWT_SECRET=your_jwt_secret_here_change_in_production
+      - BOOK_SERVICE_URL=http://book-service:8000
+      - USER_SERVICE_URL=http://user-service:3001
+      - SERVICE_TOKEN=internal-service-token-change-in-production
+    depends_on:
+      - postgresql
+      - rabbitmq
+      - book-service
+      - user-service
+    networks:
+      - library_network
+
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    container_name: library_notification_service
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      - ENVIRONMENT=production
+      - REDIS_URL=redis://redis:6379/0
+      - RABBITMQ_URL=amqp://admin:password123@rabbitmq:5672
+      - EMAIL_SMTP_HOST=smtp.gmail.com
+      - EMAIL_SMTP_PORT=587
+      - EMAIL_USERNAME=your_email@gmail.com
+      - EMAIL_PASSWORD=your_app_password
+    depends_on:
+      - redis
+      - rabbitmq
+    networks:
+      - library_network
+
+volumes:
+  mongodb_data:
+  mysql_data:
+  postgresql_data:
+  redis_data:
+  rabbitmq_data:
+
+networks:
+  library_network:
+    driver: bridge 
